@@ -1,0 +1,577 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Matrix Defense - Complete Edition</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;700&family=Orbitron:wght@500;700;900&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-dark: #09090b;
+            --panel-bg: rgba(18, 18, 24, 0.95);
+            --font-display: 'Orbitron', sans-serif;
+            --font-sans: 'Inter', sans-serif;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { width: 100vw; height: 100vh; overflow: hidden; background-color: var(--bg-dark); color: #f4f4f5; font-family: var(--font-sans); display: flex; }
+        #gameContainer { flex: 1; display: flex; flex-direction: column; height: 100vh; position: relative; }
+        
+        #topBar {
+            background: rgba(13, 13, 18, 0.95); padding: 15px 25px; border-bottom: 2px solid rgba(0, 255, 102, 0.4);
+            display: flex; justify-content: space-around; gap: 15px; z-index: 10;
+        }
+        .stat { background: rgba(30, 30, 40, 0.5); border: 1px solid rgba(255, 255, 255, 0.06); border-radius: 10px; padding: 8px 18px; display: flex; align-items: center; gap: 12px; }
+        .stat-label { color: #a1a1aa; font-size: 0.85em; text-transform: uppercase; letter-spacing: 1px; }
+        .stat-value { font-family: var(--font-display); font-size: 1.3em; font-weight: 700; text-shadow: 0 0 8px currentColor; }
+        .stat-value.money { color: #ffdd00; } .stat-value.health { color: #ff4466; } .stat-value.wave { color: #00ddff; }
+        
+        canvas { flex: 1; background: #09090b; cursor: crosshair; display: block; }
+        
+        #sidebar {
+            width: 340px; background: rgba(13, 13, 18, 0.95); border-left: 2px solid rgba(0, 255, 102, 0.4);
+            padding: 15px; overflow-y: auto; height: 100vh; display: flex; flex-direction: column; gap: 15px; z-index: 10;
+        }
+        h3 { font-family: var(--font-display); color: #00ff66; font-size: 1.05em; letter-spacing: 1.5px; text-transform: uppercase; border-bottom: 1px solid rgba(0, 255, 102, 0.2); padding-bottom: 8px; }
+        
+        .wave-info { background: linear-gradient(135deg, rgba(20, 40, 20, 0.6) 0%, rgba(10, 25, 10, 0.8) 100%); padding: 14px; border-radius: 12px; border: 1px solid rgba(0, 255, 102, 0.3); display: flex; flex-direction: column; gap: 8px; }
+        .start-wave-btn { width: 100%; padding: 12px; background: linear-gradient(135deg, #00ff66, #00b347); color: #000; border: none; border-radius: 8px; font-family: var(--font-display); font-weight: 900; cursor: pointer; text-transform: uppercase; }
+        .start-wave-btn:disabled { background: #333; color: #666; cursor: not-allowed; }
+
+        .tower-option { background: rgba(30, 30, 40, 0.4); border: 1px solid rgba(255, 255, 255, 0.06); border-radius: 10px; padding: 10px; margin-bottom: 8px; cursor: pointer; position: relative; }
+        .tower-option::before { content: ''; position: absolute; left: 0; top: 0; height: 100%; width: 3px; background: var(--tower-color, #00ff66); }
+        .tower-option.selected { border-color: var(--tower-color); background: rgba(20, 35, 25, 0.5); }
+        .tower-header { display: flex; justify-content: space-between; font-weight: 700; font-size: 0.9em; }
+        .tower-cost { color: #ffdd00; font-family: var(--font-display); }
+        .tower-stats { font-size: 0.75em; color: #94a3b8; margin-top: 2px; }
+        .tower-ability { font-size: 0.72em; color: #38bdf8; font-style: italic; }
+
+        #actionPanel { background: rgba(20, 25, 35, 0.9); border: 1px solid #00ddff; border-radius: 12px; padding: 12px; display: none; flex-direction: column; gap: 8px; }
+        .action-title { font-family: var(--font-display); color: #00ddff; font-size: 0.95em; text-transform: uppercase; }
+        .action-stats { font-size: 0.82em; color: #a1a1aa; }
+        .action-buttons { display: flex; gap: 8px; margin-top: 4px; }
+        .act-btn { flex: 1; padding: 10px; border: none; border-radius: 6px; font-family: var(--font-display); font-weight: 700; cursor: pointer; text-transform: uppercase; }
+        .btn-upgrade { background: linear-gradient(135deg, #00ddff, #0088cc); color: #fff; }
+        .btn-upgrade:disabled { background: #333; color: #666; cursor: not-allowed; }
+        .btn-sell { background: linear-gradient(135deg, #ef4444, #b91c1c); color: #fff; }
+
+        #gameOver { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(5, 5, 8, 0.95); display: none; flex-direction: column; justify-content: center; align-items: center; z-index: 1000; }
+        #gameOver.show { display: flex; }
+        #gameOver h1 { font-family: var(--font-display); font-size: 4em; color: #ff003c; }
+        #gameOver button { margin-top: 35px; padding: 15px 45px; font-family: var(--font-display); background: #00ff66; border: none; border-radius: 8px; cursor: pointer; font-weight: 900; }
+    </style>
+</head>
+<body>
+    <div id="gameContainer">
+        <div id="topBar">
+            <div class="stat"><span class="stat-label">💰 Money:</span><span class="stat-value money" id="money">750</span></div>
+            <div class="stat"><span class="stat-label">❤️ Health:</span><span class="stat-value health" id="health">20</span></div>
+            <div class="stat"><span class="stat-label">🌊 Wave:</span><span class="stat-value wave" id="waveDisplay">0</span></div>
+        </div>
+        <canvas id="gameCanvas"></canvas>
+    </div>
+
+    <div id="sidebar">
+        <div class="wave-info">
+            <div style="display: flex; justify-content: space-between; font-size: 0.9em;">
+                <span>🧟 Active Enemies:</span><span id="enemyCount" style="color:#00ff66; font-weight:bold;">0</span>
+            </div>
+            <button class="start-wave-btn" id="startWaveBtn" onclick="startWave()">START NEXT WAVE</button>
+        </div>
+
+        <div id="actionPanel">
+            <div class="action-title" id="actTitle">Defense Module</div>
+            <div class="action-stats">Level Tier: <span id="actLevel" style="color:#00ddff">1</span></div>
+            <div class="action-stats">Current Damage: <span id="actDamage">0</span></div>
+            <div class="action-stats">Current Range: <span id="actRange">0</span></div>
+            <div class="action-buttons">
+                <button class="act-btn btn-upgrade" id="upBtn" onclick="upgradeSelectedTower()">Upgrade</button>
+                <button class="act-btn btn-sell" id="sellBtn" onclick="sellSelectedTower()">Sell</button>
+            </div>
+        </div>
+
+        <div style="flex: 1; overflow-y: auto;">
+            <h3>🏰 Roster Configuration</h3>
+            <div id="towerList"></div>
+        </div>
+    </div>
+
+    <div id="gameOver">
+        <h1>DEFEAT DETECTED</h1>
+        <button onclick="location.reload()">RE-INITIALIZE MATRIX</button>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        
+        function resizeCanvas() {
+            const container = document.getElementById('gameContainer');
+            canvas.width = container.clientWidth;
+            canvas.height = container.clientHeight - 60;
+        }
+        resizeCanvas();
+
+        let gameState = { money: 3500, health: 20, wave: 0 };
+        let selectedTowerType = null;
+        let activeBuiltTower = null; 
+        let mouseX = 0, mouseY = 0;
+
+        let towers = []; let enemies = []; let projectiles = []; let particles = []; let spawnQueue = []; let visualFx = []; 
+
+        const towerTypes = {
+            gunner: { name: '🔫 Gunner', cost: 100, damage: 15, range: 137, fireRate: 1.5, color: '#ff7700', glow: 'rgba(255,119,0,0.3)', ability: 'Tracer Kinetics' },
+            minigunner: { name: '🔪 Minigunner', cost: 180, damage: 5, range: 148, fireRate: 60, color: '#ff3333', glow: 'rgba(255,51,51,0.3)', ability: 'Gatling Cascade' },
+            shotguneer: { name: '💥 Shotgunner', cost: 220, damage: 20, range: 104, fireRate: 0.8, color: '#ffaa00', glow: 'rgba(255,170,0,0.3)', ability: '5x Directional Shrapnel' },
+            sniper: { name: '🎯 Sniper', cost: 300, damage: 118, range: 297, fireRate: 0.4, color: '#00ddff', glow: 'rgba(0,221,255,0.3)', ability: 'Instant Hitscan Laser' },
+            cannon: { name: '💣 Cannon', cost: 380, damage: 75, range: 176, fireRate: 0.6, color: '#e5c158', glow: 'rgba(229,193,88,0.3)', ability: 'HE Blast Radii' },
+            laser: { name: '⚡ Plasma Laser', cost: 450, damage: 3, range: 165, fireRate: 600, color: '#00ff66', glow: 'rgba(0,255,102,0.3)', ability: 'Continuous Beam Melt' },
+            tesla: { name: '⚡ Tesla Coil', cost: 500, damage: 56, range: 143, fireRate: 0.8, color: '#00ffff', glow: 'rgba(0,255,255,0.3)', ability: 'Branching Lightning Matrix' },
+            cryo: { name: '❄️ Cryo Emitter', cost: 550, damage: 4, range: 137, fireRate: 12, color: '#33a3ff', glow: 'rgba(51,163,255,0.3)', ability: 'Sub-Zero Expansion Mist' },
+            pyro: { name: '🔥 Flamethrower', cost: 600, damage: 4, range: 121, fireRate: 20, color: '#ff4500', glow: 'rgba(255,69,0,0.3)', ability: 'Spreading Thermal Vector' },
+            bio: { name: '☣️ Bio Launcher', cost: 520, damage: 43, range: 154, fireRate: 2, color: '#88ff00', glow: 'rgba(136,255,0,0.3)', ability: 'Corrosive Toxin Splash' },
+            mammoth: { name: '🐘 Mammoth Heavy', cost: 800, damage: 750, range: 203, fireRate: 0.35, color: '#8b7355', glow: 'rgba(139,115,85,0.3)', ability: 'Massive Armor Piercing Shell' },
+            pulser: { name: '🔮 Pulser Node', cost: 260, damage: 35, range: 137, fireRate: 1.1, color: '#d946ef', glow: 'rgba(217,70,239,0.3)', ability: 'Barrel-free 360 Radial Nova' },
+            railgun: { name: '🚄 Hyper Railgun', cost: 650, damage: 675, range: 341, fireRate: 0.3, color: '#3b82f6', glow: 'rgba(59,130,246,0.3)', ability: 'High Velocity Rail Streak' },
+            missile: { name: '🚀 Rocket Pod', cost: 480, damage: 200, range: 220, fireRate: 0.5, color: '#f43f5e', glow: 'rgba(244,63,94,0.3)', ability: 'Tracking Payload' },
+            artillery: { name: '🌋 Siege Mortar', cost: 750, damage: 1000, range: 396, fireRate: 0.25, color: '#b45309', glow: 'rgba(180,83,9,0.3)', ability: 'High-Arc Drop Ballistics' },
+            sonic: { name: '🔊 Sonic Wave', cost: 1000, damage: 50, range: 121, fireRate: 8, color: '#a855f7', glow: 'rgba(168,85,247,0.3)', ability: 'Concussive Audio Emitters' },
+            prism: { name: '💎 Prism Crystal', cost: 1200, damage: 25, range: 154, fireRate: 0.9, color: '#10b981', glow: 'rgba(16,185,129,0.3)', ability: 'Refractive Focus Beams' },
+            swarm: { name: '🐝 Drone Swarm', cost: 580, damage: 5, range: 181, fireRate: 120, color: '#fbbf24', glow: 'rgba(251,191,36,0.3)', ability: 'Sine-Weave Quad Drones' },
+            acid: { name: '🧪 Acid Spitter', cost: 340, damage: 20, range: 143, fireRate: 5.2, color: '#22c55e', glow: 'rgba(34,197,94,0.3)', ability: 'Dissolving Acid Aerosols' },
+            gravity: { name: '🌌 Singularity', cost: 700, damage: 500, range: 159, fireRate: 0.6, color: '#6366f1', glow: 'rgba(99,102,241,0.3)', ability: 'Localized Gravitational Core' },
+            vortex: { name: '🌀 Void Vortex', cost: 750, damage: 680, range: 148, fireRate: 0.5, color: '#4f46e5', glow: 'rgba(79,70,229,0.3)', ability: 'Swirling Horizon Compressions' },
+            void_rift: { name: '🕳️ Rift Horizon', cost: 530, damage: 450, range: 176, fireRate: 0.5, color: '#312e81', glow: 'rgba(49,46,129,0.3)', ability: 'Torn Spatial Horizon Leak' },
+            seismic: { name: '🔨 Tectonic Slam', cost: 410, damage: 87, range: 137, fireRate: 0.7, color: '#7c2d12', glow: 'rgba(124,45,18,0.3)', ability: 'Radiating Shock Ground Cracks' },
+            quantum: { name: '⚛️ Quantum Core', cost: 720, damage: 500, range: 198, fireRate: 0.4, color: '#0891b2', glow: 'rgba(8,145,178,0.3)', ability: 'Orbital Atomic Deconstruction' },
+            reaper: { name: '💀 Soul Scythe', cost: 440, damage: 200, range: 104, fireRate: 1.2, color: '#64748b', glow: 'rgba(100,116,139,0.3)', ability: 'Broad Frontal Crescent Slash' },
+            overload: { name: '⚡ Flux Dynamo', cost: 2000, damage: 850, range: 154, fireRate: 1.5, color: '#be123c', glow: 'rgba(190,18,60,0.3)', ability: 'Branching Crimson Power Surges' }
+        };
+
+        const enemyTypes = {
+            speedy: { health: 35, speed: 2.6, reward: 16, color: '#ff6666', size: 8 },
+            slow: { health: 130, speed: 0.85, reward: 58, color: '#ff2222', size: 14 },
+            tanky: { health: 220, speed: 1.15, reward: 115, color: '#990000', size: 16 },
+            boss: { health: 1800, speed: 0.55, reward: 520, color: '#ff0055', size: 22 },
+            sprinter: { health: 25, speed: 4.2, reward: 20, color: '#ff44aa', size: 6 },
+            bulwark: { health: 450, speed: 0.65, reward: 210, color: '#4444ff', size: 20 },
+            regenerator: { health: 180, speed: 0.9, reward: 95, color: '#00ff44', size: 12 },
+            phaser: { health: 90, speed: 1.8, reward: 75, color: '#aa00ff', size: 10 },
+            shielded: { health: 260, speed: 1.0, reward: 140, color: '#ffffff', size: 18 },
+            swarm_lord: { health: 2500, speed: 0.45, reward: 800, color: '#ffaa00', size: 26 }
+        };
+
+        const pathPercent = [ {x: 40/800, y: 40/500}, {x: 180/800, y: 40/500}, {x: 180/800, y: 150/500}, {x: 320/800, y: 150/500}, {x: 320/800, y: 260/500}, {x: 440/800, y: 260/500}, {x: 440/800, y: 110/500}, {x: 560/800, y: 110/500}, {x: 560/800, y: 240/500}, {x: 680/800, y: 240/500}, {x: 680/800, y: 350/500}, {x: 500/800, y: 350/500}, {x: 500/800, y: 430/500}, {x: 340/800, y: 430/500}, {x: 340/800, y: 300/500}, {x: 200/800, y: 300/500}, {x: 200/800, y: 400/500}, {x: 70/800, y: 400/500}, {x: 70/800, y: 210/500}, {x: 750/800, y: 210/500}, {x: 750/800, y: 450/500}, {x: 790/800, y: 450/500} ];
+        let path = [];
+        function initializePath() { path = pathPercent.map(p => ({ x: p.x * canvas.width, y: p.y * canvas.height })); }
+        initializePath();
+
+        function createSparks(x, y, color, count = 8) {
+            for (let i = 0; i < count; i++) {
+                particles.push({ x, y, vx: (Math.random() - 0.5) * 5, vy: (Math.random() - 0.5) * 5, color, life: 20 + Math.random() * 10 });
+            }
+        }
+
+        function dealDamage(enemy, amount, color, x, y, sparks = true) {
+            if (enemy.untargetable) return; // Phaser immunity
+            let remainingDmg = amount;
+            if (enemy.shieldHealth > 0) {
+                if (remainingDmg >= enemy.shieldHealth) {
+                    remainingDmg -= enemy.shieldHealth; enemy.shieldHealth = 0;
+                } else {
+                    enemy.shieldHealth -= remainingDmg; remainingDmg = 0;
+                }
+            }
+            enemy.health -= remainingDmg;
+            if (sparks) createSparks(x, y, color, 3);
+            checkEnemyDeath(enemy);
+        }
+
+        class Tower {
+            constructor(x, y, type) {
+                this.x = x; this.y = y; this.type = type; this.stats = {...towerTypes[type]};
+                this.cooldown = 0; this.rotation = 0; this.level = 1;
+                this.totalInvestment = this.stats.cost; this.upgradeCost = Math.floor(this.stats.cost * 0.75);
+                this.beamTarget = null;
+            }
+            update() {
+                if (this.cooldown > 0) this.cooldown--;
+                let target = null; let minDist = this.stats.range;
+                enemies.forEach(e => {
+                    if (e.untargetable) return;
+                    let d = Math.hypot(e.x - this.x, e.y - this.y);
+                    if (d < minDist) { minDist = d; target = e; }
+                });
+
+                this.beamTarget = null;
+                if (target) {
+                    this.rotation = Math.atan2(target.y - this.y, target.x - this.x);
+                    if (this.cooldown === 0) {
+                        if (['laser', 'prism'].includes(this.type)) {
+                            this.beamTarget = target; dealDamage(target, this.stats.damage, this.stats.color, target.x, target.y);
+                        } 
+                        else if (['tesla', 'overload'].includes(this.type)) {
+                            visualFx.push({ type: 'lightning', x1: this.x, y1: this.y, x2: target.x, y2: target.y, color: this.stats.color, life: 6 });
+                            dealDamage(target, this.stats.damage, this.stats.color, target.x, target.y, true);
+                            if (this.type === 'overload') {
+                                enemies.forEach(e => {
+                                    if (!e.untargetable && e !== target && Math.hypot(e.x - target.x, e.y - target.y) < 70) {
+                                        visualFx.push({ type: 'lightning', x1: target.x, y1: target.y, x2: e.x, y2: e.y, color: '#f43f5e', life: 5 });
+                                        dealDamage(e, this.stats.damage * 0.6, '#f43f5e', e.x, e.y, true);
+                                    }
+                                });
+                            }
+                            this.cooldown = Math.floor(60 / this.stats.fireRate);
+                        }
+                        else if (this.type === 'sniper') {
+                            visualFx.push({ type: 'railSnap', x1: this.x, y1: this.y, x2: target.x, y2: target.y, color: this.stats.color, life: 10 });
+                            dealDamage(target, this.stats.damage, this.stats.color, target.x, target.y, true);
+                            this.cooldown = Math.floor(60 / this.stats.fireRate);
+                        }
+                        else if (this.type === 'pulser') {
+                            visualFx.push({ type: 'pulse', x: this.x, y: this.y, currentR: 0, maxR: this.stats.range, color: this.stats.color, speed: 6 });
+                            enemies.forEach(e => {
+                                if (!e.untargetable && Math.hypot(e.x - this.x, e.y - this.y) <= this.stats.range) {
+                                    dealDamage(e, this.stats.damage, this.stats.color, e.x, e.y, true);
+                                }
+                            });
+                            this.cooldown = Math.floor(60 / this.stats.fireRate);
+                        }
+                        else if (['gravity', 'vortex', 'void_rift', 'seismic', 'sonic'].includes(this.type)) {
+                            let fxX = ['seismic', 'sonic'].includes(this.type) ? this.x : target.x;
+                            let fxY = ['seismic', 'sonic'].includes(this.type) ? this.y : target.y;
+                            visualFx.push({ type: this.type, x: fxX, y: fxY, life: 0, maxLife: 30, color: this.stats.color, range: this.stats.range, angle: this.rotation });
+                            enemies.forEach(e => {
+                                if (!e.untargetable && Math.hypot(e.x - fxX, e.y - fxY) <= this.stats.range) dealDamage(e, this.stats.damage, this.stats.color, e.x, e.y, false);
+                            });
+                            this.cooldown = Math.floor(60 / this.stats.fireRate);
+                        }
+                        else if (this.type === 'reaper') {
+                            visualFx.push({ type: 'scythe', x: this.x, y: this.y, angle: this.rotation, progress: 0, maxProgress: 14, color: '#cbd5e1', range: this.stats.range });
+                            enemies.forEach(e => {
+                                if (!e.untargetable && Math.hypot(e.x - this.x, e.y - this.y) <= this.stats.range) {
+                                    let angleToEnemy = Math.atan2(e.y - this.y, e.x - this.x);
+                                    let diff = Math.abs(angleToEnemy - this.rotation);
+                                    if (diff < 0.85 || diff > Math.PI * 2 - 0.85) dealDamage(e, this.stats.damage, '#94a3b8', e.x, e.y, true);
+                                }
+                            });
+                            this.cooldown = Math.floor(60 / this.stats.fireRate);
+                        }
+                        else if (['pyro', 'acid', 'cryo'].includes(this.type)) {
+                            let spreadAngle = this.rotation + (Math.random() - 0.5) * 0.35;
+                            projectiles.push({ x: this.x, y: this.y, vx: Math.cos(spreadAngle) * 5, vy: Math.sin(spreadAngle) * 5, damage: this.stats.damage, color: this.stats.color, type: this.type, isVector: true, life: 25, maxLife: 25 });
+                            this.cooldown = Math.floor(60 / this.stats.fireRate);
+                        }
+                        else if (this.type === 'shotguneer') {
+                            for (let i = -2; i <= 2; i++) {
+                                let offset = this.rotation + (i * 0.16);
+                                projectiles.push({ x: this.x, y: this.y, vx: Math.cos(offset) * 8, vy: Math.sin(offset) * 8, damage: this.stats.damage, color: this.stats.color, type: 'shotguneer', isVector: true });
+                            }
+                            this.cooldown = Math.floor(60 / this.stats.fireRate);
+                        }
+                        else if (this.type === 'swarm') {
+                            projectiles.push({ x: this.x, y: this.y, target: target, speed: 5, damage: this.stats.damage, color: this.stats.color, type: 'swarm', isVector: false, waveOffset: Math.random() * Math.PI * 2 });
+                            this.cooldown = Math.floor(60 / this.stats.fireRate);
+                        }
+                        else if (this.type === 'artillery') {
+                            projectiles.push({ x: this.x, y: this.y, targetX: target.x, targetY: target.y, tx: this.x, ty: this.y, tProgress: 0, damage: this.stats.damage, color: this.stats.color, type: 'artillery', isVector: false });
+                            this.cooldown = Math.floor(60 / this.stats.fireRate);
+                        }
+                        else {
+                            projectiles.push({
+                                x: this.x, y: this.y, target: this.type === 'railgun' ? null : target,
+                                vx: this.type === 'railgun' ? Math.cos(this.rotation) * 16 : null, vy: this.type === 'railgun' ? Math.sin(this.rotation) * 16 : null,
+                                speed: ['gunner', 'minigunner'].includes(this.type) ? 10 : 7, damage: this.stats.damage, color: this.stats.color, type: this.type,
+                                isVector: this.type === 'railgun', pierce: this.type === 'railgun', hitTracker: []
+                            });
+                            this.cooldown = Math.floor(60 / this.stats.fireRate);
+                        }
+                    }
+                }
+            }
+            draw() {
+                if (['laser', 'prism'].includes(this.type) && this.beamTarget && enemies.includes(this.beamTarget) && !this.beamTarget.untargetable) {
+                    ctx.save(); ctx.lineWidth = this.type === 'prism' ? 2.5 : 4; ctx.strokeStyle = this.stats.color; ctx.shadowBlur = 10; ctx.shadowColor = this.stats.color;
+                    ctx.beginPath(); ctx.moveTo(this.x, this.y); ctx.lineTo(this.beamTarget.x, this.beamTarget.y); ctx.stroke();
+                    if (this.type === 'prism') { ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 1; ctx.stroke(); }
+                    ctx.restore();
+                }
+                ctx.save(); ctx.shadowBlur = 6; ctx.shadowColor = this.stats.color; ctx.beginPath(); ctx.arc(this.x, this.y, 15, 0, Math.PI * 2);
+                ctx.fillStyle = '#121216'; ctx.strokeStyle = this.stats.color; ctx.lineWidth = 2; ctx.fill(); ctx.stroke(); ctx.restore();
+
+                if (this.type === 'pulser') {
+                    ctx.save(); ctx.shadowBlur = 12; ctx.shadowColor = this.stats.color; let pulseScalar = 1 + Math.sin(Date.now() * 0.01) * 0.15;
+                    ctx.strokeStyle = this.stats.color; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(this.x, this.y, 8 * pulseScalar, 0, Math.PI * 2); ctx.stroke();
+                    ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.arc(this.x, this.y, 4, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+                    return; 
+                }
+                ctx.save(); ctx.translate(this.x, this.y); ctx.rotate(this.rotation); ctx.fillStyle = '#3f3f46';
+                switch(this.type) {
+                    case 'reaper':
+                        ctx.fillStyle = '#1e293b'; ctx.fillRect(-3, -3, 6, 6); ctx.strokeStyle = '#64748b'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(0, 0); ctx.quadraticCurveTo(8, -14, 15, -4); ctx.stroke(); break;
+                    case 'pyro': case 'acid': case 'cryo':
+                        ctx.fillRect(0, -4, 14, 8); ctx.fillStyle = this.stats.color; ctx.fillRect(12, -5, 3, 10); break;
+                    case 'laser': case 'prism':
+                        ctx.beginPath(); ctx.arc(0, 0, 6, 0, Math.PI*2); ctx.fill(); ctx.fillStyle = this.stats.color; ctx.fillRect(2, -2, 14, 4); break;
+                    case 'railgun': case 'mammoth':
+                        ctx.fillRect(-4, -4, 24, 8); ctx.fillStyle = this.stats.color; ctx.fillRect(12, -5, 10, 2); ctx.fillRect(12, 3, 10, 2); break;
+                    case 'tesla': case 'overload':
+                        ctx.fillStyle = '#27272a'; ctx.beginPath(); ctx.arc(0, 0, 8, 0, Math.PI*2); ctx.fill(); ctx.fillStyle = this.stats.color; ctx.beginPath(); ctx.arc(0, 0, 4, 0, Math.PI*2); ctx.fill(); break;
+                    case 'gravity': case 'vortex': case 'void_rift':
+                        ctx.fillStyle = '#18181b'; ctx.beginPath(); ctx.arc(0, 0, 9, 0, Math.PI*2); ctx.fill(); ctx.strokeStyle = this.stats.color; ctx.stroke(); break;
+                    default:
+                        ctx.fillRect(0, -3, 16, 6); ctx.fillStyle = this.stats.color; ctx.fillRect(12, -2, 4, 4); break;
+                }
+                ctx.restore();
+            }
+        }
+
+        class Enemy {
+            constructor(type, overrideIdx = 0, overrideProg = 0) {
+                this.type = type; const config = enemyTypes[type];
+                this.maxHealth = config.health * (1 + gameState.wave * 0.18); this.health = this.maxHealth;
+                this.speed = config.speed; this.reward = config.reward; this.color = config.color; this.size = config.size;
+                this.pathIndex = overrideIdx; this.progress = overrideProg;
+                this.x = path[this.pathIndex].x; this.y = path[this.pathIndex].y;
+                
+                // Special Abilities Flags
+                this.isRegen = type === 'regenerator';
+                this.isShielded = type === 'shielded';
+                this.isPhaser = type === 'phaser';
+                this.isSwarmLord = type === 'swarm_lord';
+                this.shieldHealth = this.isShielded ? this.maxHealth * 0.6 : 0;
+                this.untargetable = false;
+            }
+            update() {
+                if (this.isRegen && this.health < this.maxHealth) this.health += (this.maxHealth * 0.001);
+                if (this.isPhaser) this.untargetable = (Date.now() % 3000 < 800); // Intangible 0.8s every 3s
+
+                if (this.pathIndex >= path.length - 1) return false;
+                let start = path[this.pathIndex]; let end = path[this.pathIndex + 1];
+                let distance = Math.hypot(end.x - start.x, end.y - start.y);
+                this.progress += this.speed / distance;
+                if (this.progress >= 1) {
+                    this.progress = 0; this.pathIndex++;
+                    if (this.pathIndex >= path.length - 1) return false;
+                }
+                start = path[this.pathIndex]; end = path[this.pathIndex + 1];
+                this.x = start.x + (end.x - start.x) * this.progress; this.y = start.y + (end.y - start.y) * this.progress;
+                return true;
+            }
+            draw() {
+                ctx.save();
+                ctx.shadowBlur = this.untargetable ? 2 : 6; ctx.shadowColor = this.color;
+                ctx.globalAlpha = this.untargetable ? 0.3 : 1.0;
+                ctx.fillStyle = this.color; ctx.beginPath(); ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2); ctx.fill();
+                
+                if (this.shieldHealth > 0) {
+                    ctx.strokeStyle = '#00ddff'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(this.x, this.y, this.size + 3, 0, Math.PI * 2); ctx.stroke();
+                }
+                ctx.restore();
+
+                let barW = this.size * 2; let bx = this.x - this.size; let by = this.y - this.size - 8;
+                ctx.fillStyle = 'rgba(255,0,0,0.4)'; ctx.fillRect(bx, by, barW, 3);
+                ctx.fillStyle = '#00ff66'; ctx.fillRect(bx, by, barW * (this.health / this.maxHealth), 3);
+                if (this.shieldHealth > 0) {
+                    ctx.fillStyle = '#00ddff'; ctx.fillRect(bx, by - 4, barW * (this.shieldHealth / (this.maxHealth * 0.6)), 2);
+                }
+            }
+        }
+
+        function checkEnemyDeath(e) {
+            if (e.health <= 0) {
+                let idx = enemies.indexOf(e);
+                if (idx > -1) {
+                    gameState.money += e.reward;
+                    if (e.isSwarmLord) {
+                        enemies.push(new Enemy('sprinter', e.pathIndex, e.progress));
+                        enemies.push(new Enemy('sprinter', e.pathIndex, Math.max(0, e.progress - 0.05)));
+                    }
+                    enemies.splice(idx, 1);
+                }
+            }
+        }
+
+        function renderTowerOptions() {
+            const list = document.getElementById('towerList'); list.innerHTML = '';
+            Object.keys(towerTypes).forEach(key => {
+                const t = towerTypes[key]; const item = document.createElement('div');
+                item.className = `tower-option ${selectedTowerType === key ? 'selected' : ''}`;
+                item.style.setProperty('--tower-color', t.color); item.style.setProperty('--tower-glow', t.glow);
+                item.innerHTML = `<div class="tower-header"><span class="tower-name">${t.name}</span><span class="tower-cost">$${t.cost}</span></div><div class="tower-stats">Dmg: ${t.damage} | Rng: ${t.range}</div><div class="tower-ability">⭐ ${t.ability}</div>`;
+                item.onclick = (e) => { e.stopPropagation(); activeBuiltTower = null; selectedTowerType = selectedTowerType === key ? null : key; renderTowerOptions(); updateActionUI(); };
+                list.appendChild(item);
+            });
+        }
+        renderTowerOptions();
+
+        canvas.onmousemove = (e) => { const rect = canvas.getBoundingClientRect(); mouseX = e.clientX - rect.left; mouseY = e.clientY - rect.top; };
+        canvas.onclick = (e) => {
+            const rect = canvas.getBoundingClientRect(); const cx = e.clientX - rect.left; const cy = e.clientY - rect.top;
+            if (selectedTowerType) {
+                const config = towerTypes[selectedTowerType];
+                if (gameState.money >= config.cost) {
+                    gameState.money -= config.cost; towers.push(new Tower(cx, cy, selectedTowerType));
+                    createSparks(cx, cy, config.color, 12); if (!e.shiftKey) selectedTowerType = null; renderTowerOptions();
+                } return;
+            }
+            let clicked = null; towers.forEach(t => { if (Math.hypot(t.x - cx, t.y - cy) < 20) clicked = t; });
+            activeBuiltTower = clicked; updateActionUI();
+        };
+
+        function updateActionUI() {
+            const panel = document.getElementById('actionPanel');
+            if (!activeBuiltTower) { panel.style.display = 'none'; return; }
+            panel.style.display = 'flex';
+            document.getElementById('actTitle').textContent = activeBuiltTower.stats.name; document.getElementById('actLevel').textContent = activeBuiltTower.level;
+            document.getElementById('actDamage').textContent = activeBuiltTower.stats.damage; document.getElementById('actRange').textContent = activeBuiltTower.stats.range;
+            const upBtn = document.getElementById('upBtn'); upBtn.textContent = `Upgrade ($${activeBuiltTower.upgradeCost})`; upBtn.disabled = gameState.money < activeBuiltTower.upgradeCost;
+            document.getElementById('sellBtn').textContent = `Sell (+$${Math.floor(activeBuiltTower.totalInvestment * 0.60)})`;
+        }
+
+        function upgradeSelectedTower() {
+            if (!activeBuiltTower || gameState.money < activeBuiltTower.upgradeCost) return;
+            gameState.money -= activeBuiltTower.upgradeCost; activeBuiltTower.totalInvestment += activeBuiltTower.upgradeCost;
+            activeBuiltTower.level++; activeBuiltTower.stats.damage = parseFloat((activeBuiltTower.stats.damage * 1.35).toFixed(1)); activeBuiltTower.stats.range = Math.floor(activeBuiltTower.stats.range * 1.12);
+            createSparks(activeBuiltTower.x, activeBuiltTower.y, '#00ddff', 12); activeBuiltTower.upgradeCost = Math.floor(activeBuiltTower.upgradeCost * 1.6); updateActionUI();
+        }
+
+        function sellSelectedTower() {
+            if (!activeBuiltTower) return;
+            gameState.money += Math.floor(activeBuiltTower.totalInvestment * 0.60);
+            createSparks(activeBuiltTower.x, activeBuiltTower.y, '#ef4444', 16);
+            let idx = towers.indexOf(activeBuiltTower); if (idx > -1) towers.splice(idx, 1);
+            activeBuiltTower = null; updateActionUI();
+        }
+
+        function startWave() {
+            gameState.wave++; document.getElementById('startWaveBtn').disabled = true;
+            let keys = Object.keys(enemyTypes);
+            let count = 8 + gameState.wave * 5;
+            for(let i=0; i<count; i++) {
+                // Bias earlier waves to easier enemies, later waves to harder
+                let randIdx = Math.floor(Math.random() * (Math.min(keys.length, 3 + Math.floor(gameState.wave / 2))));
+                spawnQueue.push(keys[randIdx % keys.length]);
+            }
+        }
+
+        let spawnTimer = 0;
+        function gameLoop() {
+            if (spawnQueue.length > 0) { spawnTimer++; if (spawnTimer > 35) { enemies.push(new Enemy(spawnQueue.shift())); spawnTimer = 0; } }
+            towers.forEach(t => t.update());
+            for (let i = enemies.length - 1; i >= 0; i--) { if (!enemies[i].update()) { gameState.health--; enemies.splice(i, 1); } }
+            
+            for(let i = visualFx.length - 1; i >= 0; i--) {
+                let fx = visualFx[i];
+                if (fx.type === 'pulse') { fx.currentR += fx.speed; if(fx.currentR >= fx.maxR) visualFx.splice(i, 1); }
+                else if (fx.type === 'scythe') { fx.progress++; if (fx.progress >= fx.maxProgress) visualFx.splice(i, 1); }
+                else if (['lightning', 'railSnap'].includes(fx.type)) { fx.life--; if (fx.life <= 0) visualFx.splice(i, 1); }
+                else if (['gravity', 'vortex', 'void_rift', 'seismic', 'sonic'].includes(fx.type)) { fx.life++; if (fx.life >= fx.maxLife) visualFx.splice(i, 1); }
+            }
+
+            for (let i = projectiles.length - 1; i >= 0; i--) {
+                let p = projectiles[i];
+                if (p.isVector) {
+                    if (['pyro', 'acid', 'cryo'].includes(p.type)) { p.life--; if (p.life <= 0) { projectiles.splice(i, 1); continue; } }
+                    p.x += p.vx; p.y += p.vy;
+                    if (p.x < 0 || p.x > canvas.width || p.y < 0 || p.y > canvas.height) { projectiles.splice(i, 1); continue; }
+                    for (let j = enemies.length - 1; j >= 0; j--) {
+                        let e = enemies[j]; if (e.untargetable) continue;
+                        let sizeThresh = ['pyro', 'acid', 'cryo'].includes(p.type) ? e.size + 15 : e.size + 6;
+                        if (Math.hypot(e.x - p.x, e.y - p.y) < sizeThresh) {
+                            if (p.pierce) {
+                                if (!p.hitTracker.includes(e)) { p.hitTracker.push(e); dealDamage(e, p.damage, p.color, p.x, p.y, true); }
+                            } else {
+                                dealDamage(e, p.damage, p.color, p.x, p.y, true);
+                                if (!['pyro', 'acid', 'cryo'].includes(p.type)) { projectiles.splice(i, 1); break; }
+                            }
+                        }
+                    }
+                } else {
+                    if (p.type === 'artillery') {
+                        p.tProgress += 0.04; let dx = p.targetX - p.tx, dy = p.targetY - p.ty; p.x = p.tx + dx * p.tProgress; p.y = p.ty + dy * p.tProgress;
+                        if (p.tProgress >= 1) {
+                            enemies.forEach(e => { if (!e.untargetable && Math.hypot(e.x - p.targetX, e.y - p.targetY) <= 75) dealDamage(e, p.damage, p.color, e.x, e.y, false); });
+                            createSparks(p.targetX, p.targetY, p.color, 14); projectiles.splice(i, 1);
+                        } continue;
+                    }
+                    if (!enemies.includes(p.target) || p.target.untargetable) { projectiles.splice(i, 1); continue; }
+                    let dx = p.target.x - p.x, dy = p.target.y - p.y; let dist = Math.hypot(dx, dy);
+                    if (dist < 8) {
+                        if (['cannon', 'missile', 'bio', 'mammoth'].includes(p.type)) {
+                            let splR = p.type === 'mammoth' ? 30 : p.type === 'cannon' ? 55 : 65;
+                            enemies.forEach(e => { if (!e.untargetable && Math.hypot(e.x - p.x, e.y - p.y) <= splR) dealDamage(e, p.damage, p.color, e.x, e.y, false); });
+                            createSparks(p.x, p.y, p.color, 10);
+                        } else { dealDamage(p.target, p.damage, p.color, p.x, p.y, true); }
+                        projectiles.splice(i, 1);
+                    } else {
+                        if (p.type === 'swarm') {
+                            let perpX = -dy / dist, perpY = dx / dist; let sw = Math.sin(Date.now() * 0.015 + p.waveOffset) * 2.5;
+                            p.x += (dx / dist) * p.speed + perpX * sw; p.y += (dy / dist) * p.speed + perpY * sw;
+                        } else { p.x += (dx / dist) * p.speed; p.y += (dy / dist) * p.speed; }
+                    }
+                }
+            }
+
+            for (let i = particles.length - 1; i >= 0; i--) { let pt = particles[i]; pt.x += pt.vx; pt.y += pt.vy; pt.life--; if (pt.life <= 0) particles.splice(i, 1); }
+            if (enemies.length === 0 && spawnQueue.length === 0) document.getElementById('startWaveBtn').disabled = false;
+            if (gameState.health <= 0) { document.getElementById('gameOver').classList.add('show'); return; }
+            if (activeBuiltTower) updateActionUI();
+            draw(); requestAnimationFrame(gameLoop);
+        }
+
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.save(); ctx.lineWidth = 24; ctx.strokeStyle = '#141417'; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+            ctx.beginPath(); path.forEach((p, idx) => { if (idx === 0) ctx.moveTo(p.x, p.y); else ctx.lineTo(p.x, p.y); }); ctx.stroke();
+            ctx.lineWidth = 2; ctx.strokeStyle = 'rgba(0, 255, 102, 0.12)'; ctx.stroke(); ctx.restore();
+
+            enemies.forEach(e => e.draw()); towers.forEach(t => t.draw());
+
+            if (selectedTowerType) {
+                ctx.save(); ctx.beginPath(); ctx.arc(mouseX, mouseY, towerTypes[selectedTowerType].range, 0, Math.PI * 2);
+                ctx.fillStyle = 'rgba(0, 255, 102, 0.04)'; ctx.fill(); ctx.strokeStyle = 'rgba(0, 255, 102, 0.3)'; ctx.lineWidth = 1.5; ctx.setLineDash([5, 5]); ctx.stroke(); ctx.restore();
+            }
+            if (activeBuiltTower) {
+                ctx.save(); ctx.beginPath(); ctx.arc(activeBuiltTower.x, activeBuiltTower.y, activeBuiltTower.stats.range, 0, Math.PI * 2);
+                ctx.fillStyle = 'rgba(0, 221, 255, 0.04)'; ctx.fill(); ctx.strokeStyle = 'rgba(0, 221, 255, 0.4)'; ctx.lineWidth = 2; ctx.stroke(); ctx.restore();
+            }
+
+            visualFx.forEach(fx => {
+                ctx.save();
+                if (fx.type === 'pulse') { ctx.strokeStyle = fx.color; ctx.lineWidth = 3.5; ctx.shadowBlur = 10; ctx.shadowColor = fx.color; ctx.beginPath(); ctx.arc(fx.x, fx.y, fx.currentR, 0, Math.PI * 2); ctx.stroke(); }
+                else if (fx.type === 'scythe') { ctx.translate(fx.x, fx.y); ctx.rotate(fx.angle - 0.7 + (fx.progress / fx.maxProgress) * 1.4); ctx.strokeStyle = fx.color; ctx.lineWidth = 4; ctx.shadowBlur = 12; ctx.shadowColor = '#cbd5e1'; ctx.beginPath(); ctx.arc(0, 0, fx.range * 0.9, -0.2, 0.2); ctx.stroke(); }
+                else if (fx.type === 'lightning') { ctx.strokeStyle = fx.color; ctx.lineWidth = 2; ctx.shadowBlur = 8; ctx.shadowColor = fx.color; ctx.beginPath(); ctx.moveTo(fx.x1, fx.y1); for (let s = 1; s < 4; s++) { let t = s / 4; ctx.lineTo(fx.x1 + (fx.x2 - fx.x1) * t + (Math.random() - 0.5) * 16, fx.y1 + (fx.y2 - fx.y1) * t + (Math.random() - 0.5) * 16); } ctx.lineTo(fx.x2, fx.y2); ctx.stroke(); }
+                else if (fx.type === 'railSnap') { ctx.strokeStyle = fx.color; ctx.lineWidth = 3 * (fx.life / 10); ctx.shadowBlur = 10; ctx.shadowColor = fx.color; ctx.beginPath(); ctx.moveTo(fx.x1, fx.y1); ctx.lineTo(fx.x2, fx.y2); ctx.stroke(); }
+                else if (fx.type === 'gravity') { ctx.fillStyle = 'rgba(15, 15, 25, 0.6)'; ctx.strokeStyle = fx.color; ctx.lineWidth = 2; ctx.shadowBlur = 15; ctx.shadowColor = fx.color; ctx.beginPath(); ctx.arc(fx.x, fx.y, (fx.life / fx.maxLife) * fx.range * 0.4, 0, Math.PI*2); ctx.fill(); ctx.stroke(); }
+                else if (fx.type === 'vortex') { ctx.translate(fx.x, fx.y); ctx.rotate(fx.life * 0.15); ctx.strokeStyle = fx.color; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(0, 0, (fx.life / fx.maxLife) * fx.range * 0.4, 0, Math.PI, false); ctx.stroke(); }
+                else if (fx.type === 'void_rift') { ctx.strokeStyle = fx.color; ctx.lineWidth = 4 * Math.sin((fx.life / fx.maxLife) * Math.PI); ctx.beginPath(); ctx.moveTo(fx.x - 20, fx.y); ctx.quadraticCurveTo(fx.x, fx.y - 8, fx.x + 20, fx.y); ctx.quadraticCurveTo(fx.x, fx.y + 8, fx.x - 20, fx.y); ctx.stroke(); }
+                else if (fx.type === 'seismic') { ctx.strokeStyle = fx.color; ctx.lineWidth = 1.5; let p = fx.life / fx.maxLife; ctx.beginPath(); for(let a=0; a<Math.PI*2; a+=0.5) { ctx.moveTo(fx.x, fx.y); ctx.lineTo(fx.x + Math.cos(a)*fx.range*p + (Math.random()-0.5)*10, fx.y + Math.sin(a)*fx.range*p + (Math.random()-0.5)*10); } ctx.stroke(); }
+                else if (fx.type === 'sonic') { ctx.strokeStyle = fx.color; ctx.lineWidth = 3 * (1 - fx.life/fx.maxLife); ctx.beginPath(); ctx.arc(fx.x, fx.y, (fx.life / fx.maxLife) * fx.range, fx.angle - 0.5, fx.angle + 0.5); ctx.stroke(); }
+                ctx.restore();
+            });
+
+            projectiles.forEach(p => {
+                ctx.save();
+                if (['pyro', 'acid', 'cryo'].includes(p.type)) { let r = p.life / p.maxLife; ctx.shadowBlur = 8; ctx.shadowColor = p.color; ctx.fillStyle = p.type === 'pyro' ? `rgba(255,69,0,${r*0.5})` : p.type === 'acid' ? `rgba(34,197,94,${r*0.5})` : `rgba(51,163,255,${r*0.5})`; ctx.beginPath(); ctx.arc(p.x, p.y, 3 + (1 - r) * 14, 0, Math.PI * 2); ctx.fill(); } 
+                else if (p.type === 'railgun') { ctx.strokeStyle = p.color; ctx.lineWidth = 4; ctx.shadowBlur = 8; ctx.shadowColor = p.color; ctx.beginPath(); ctx.moveTo(p.x - p.vx * 0.7, p.y - p.vy * 0.7); ctx.lineTo(p.x, p.y); ctx.stroke(); }
+                else if (['gunner', 'minigunner'].includes(p.type)) { ctx.fillStyle = p.color; ctx.fillRect(p.x, p.y, 4, 2); }
+                else if (p.type === 'missile') { ctx.translate(p.x, p.y); ctx.rotate(p.target ? Math.atan2(p.target.y - p.y, p.target.x - p.x) : 0); ctx.fillStyle = '#94a3b8'; ctx.fillRect(-7, -2, 8, 4); ctx.fillStyle = '#ef4444'; ctx.beginPath(); ctx.moveTo(1, -2); ctx.lineTo(5, 0); ctx.lineTo(1, 2); ctx.fill(); }
+                else if (p.type === 'swarm') { ctx.translate(p.x, p.y); ctx.rotate(Date.now() * 0.05); ctx.strokeStyle = p.color; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(-4, 0); ctx.lineTo(4, 0); ctx.moveTo(0, -4); ctx.lineTo(0, 4); ctx.stroke(); }
+                else if (p.type === 'artillery') { ctx.fillStyle = p.color; ctx.beginPath(); ctx.arc(p.x, p.y - Math.sin(p.tProgress * Math.PI) * 45, 6, 0, Math.PI*2); ctx.fill(); }
+                else { ctx.fillStyle = p.color; ctx.beginPath(); ctx.arc(p.x, p.y, ['cannon', 'mammoth', 'bio'].includes(p.type) ? 4.5 : 2.5, 0, Math.PI * 2); ctx.fill(); }
+                ctx.restore();
+            });
+
+            ctx.save(); particles.forEach(pt => { ctx.fillStyle = pt.color; ctx.fillRect(pt.x, pt.y, 2, 2); }); ctx.restore();
+
+            document.getElementById('money').textContent = gameState.money; document.getElementById('health').textContent = gameState.health; document.getElementById('waveDisplay').textContent = gameState.wave; document.getElementById('enemyCount').textContent = enemies.length + spawnQueue.length;
+        }
+
+        window.onresize = () => { resizeCanvas(); initializePath(); };
+        gameLoop();
+    </script>
+</body>
+</html>
